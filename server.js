@@ -44,21 +44,21 @@ app.use(
 
 let userDBCredential = {};
 
-/* REGISTRATION */
+/* REGISTRATION TO WEBAUTH*/
 
-app.get('/auth/generate-registration-options', async (req, res) => {
-  const user = {
-    id: '123',
-    name: 'gigi',
-    displayName: 'Alice',
-    uid: 'alice1744963593816',
-  };
+/* Need user to be connected to register */
+// Ou oblige à la 1ere connection de se connecter via firebase/google => user aura alors forcément un uid
+// Une fois la 1ere connection réussi, on propose coté front à l'utilisateur de permettre la connexion via webAuth (évite le popup google)
+// ainsi on aura uid de user qui correspond à son uid de firebase auth
+
+app.post('/auth/generate-registration-options', async (req, res) => {
+  const { user } = req.body;
 
   const options = await generateRegistrationOptions({
     rpName: 'Mon App Quasar',
     rpID: rpID,
     userID: isoUint8Array.fromUTF8String(user.uid),
-    userName: user.name,
+    userName: user.displayName,
     attestationType: 'none',
     authenticatorSelection: {
       authenticatorAttachment: 'platform', // pour empreinte digitale
@@ -71,10 +71,10 @@ app.get('/auth/generate-registration-options', async (req, res) => {
   req.session.challenge = options.challenge;
   req.session.user = user;
 
-  console.log('options', options);
-
   res.json(options);
 });
+
+/* 2- REGISTRATION  */
 
 app.post('/auth/verify-registration', async (req, res) => {
   const { attResp } = req.body;
@@ -87,30 +87,18 @@ app.post('/auth/verify-registration', async (req, res) => {
     expectedRPID: rpID,
   });
 
-  // Génère un nouveau UID et enregistre le
-
-  // TODO: doit vérifier si l'utilisateur existe déjà dans firestore, si n'existe pas créer un nouvelle uid
-  // Ou oblige à la 1ere connection de se connecter via firebase/google => user aura alors forcément un uid
-  // Une fois la 1ere connection réussi, on propose coté front à l'utilisateur de permettre la connexion via webAuth (évite le popup google)
-  // ainsi on aura uid de user qui correspond à son uid de firebase auth
-  const userUid = req.session.user.name + Date.now();
-  req.session.user.uid = userUid;
-
   if (verification.verified) {
-    /* Credential a enregistrer dans la base de données */
+    /* TODO: Credential a enregistrer dans la base de données */
     userDBCredential = {
       ...verification.registrationInfo.credential,
       userHandle: req.session.user.uid,
     };
-    // une fois à cette étape on peut considérer que l'utilisateur est enregistré et donc connecté
 
-    /* POUR LIER A FIREBASE - Créer un token via firebase admin module */
-    /* FIREBASE AUTH - consquence de auth().createCustomToken */
-    /* SI userUid n'existe pas, cela va créer un nouvel utilisateur mais sans infos supplémentaire*/
-    /* SI userUid existe deja, alors l'authentification va fonctionner sur l'utilisateur dont uid correspond */
-    const firebaseToken = await admin.auth().createCustomToken(userUid);
+    console.log('userDBCredential', userDBCredential);
 
-    res.json({ success: true, token: firebaseToken });
+    // Pas besoin de createCustomToken car le user est déjà connecté via firebase auth
+
+    res.json({ success: true });
   } else {
     res.status(400).json({ success: false });
   }
@@ -119,7 +107,7 @@ app.post('/auth/verify-registration', async (req, res) => {
 /* LOGIN */
 
 app.get('/auth/generate-authentication-options', async (req, res) => {
-  /* récupère les credentials depuis la base de donnée */
+  /* TODO: récupère les credentials depuis la base de donnée */
   const userCredential = userDBCredential;
 
   const options = await generateAuthenticationOptions({
@@ -143,6 +131,7 @@ app.post('/auth/verify-authentication', async (req, res) => {
   const expectedChallenge = req.session.challenge;
 
   /* récupère les credentials depuis la base de donnée */
+  /* TODO: J'ai besoin d'une info venant du front pour savoir quel user trouver !!! */
   const userCredential = userDBCredential;
 
   const verification = await verifyAuthenticationResponse({
@@ -159,21 +148,16 @@ app.post('/auth/verify-authentication', async (req, res) => {
   });
 
   if (verification.verified) {
-    /* POUR LIER A FIREBASE - Créer un token via firebase admin module */
-    // userUid: on utilise celui déjà enregistrer lors de register => donc on aura besoin de le stocker en DB !
-    // TODO: comment récupérer le UID ici ?????
-    // à recuperer dans le credential (comme ici alice) ?? => voir les consoles coté front si je peux avoir cet info via asseResp ?
-    // ainsi je pourrais recup email, faire un check de firebase auth user si email existe => si existe recup de uid
+    const firebaseUid = userCredential.userHandle;
 
-    // const firebaseUid = verification.authenticationInfo.firebaseUid;
-    const firebaseUid = req.body.response.userHandle;
+    console.log('firebaseUid', req.body);
 
-    const firebaseToken = await admin.auth().createCustomToken(firebaseUid);
+    // const firebaseToken = await admin.auth().createCustomToken(firebaseUid);
 
     req.session.challenge = undefined;
     req.session.loggedIn = true;
     // créer une session ou retourner un token
-    res.json({ success: true, token: firebaseToken });
+    res.json({ success: true /* token: firebaseToken */ });
   } else {
     res.status(401).json({ success: false });
   }
@@ -195,8 +179,9 @@ app.get('/logout', (req, res) => {
 
 /* IS USER CONNECTED ? */
 
-app.get('/me', (req, res) => {
-  res.json({ user: req.session.user });
+app.get('/me', async (req, res) => {
+  /* const userDb = await admin.auth().getUser('95AoiUHOIdTf4gPxgZxpVKAwjid2'); */
+  res.json({ user: req.session.user /* userDb */ });
 });
 
 /* MIDDLEWARE FOR CONNECTED USER */
