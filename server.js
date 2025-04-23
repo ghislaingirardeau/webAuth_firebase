@@ -17,9 +17,7 @@ const app = express();
 const port = process.env.PORT || 3000;
 
 // Configuration WebAuthn
-const rpID = process.env.DEV
-  ? 'localhost'
-  : 'https://webauth-firebase.onrender.com'; // Domaine de votre application
+const rpID = process.env.DEV ? 'localhost' : 'ghislaingirardeau.github.io'; // Domaine de votre application
 const origin = process.env.DEV
   ? `http://${rpID}:9200`
   : 'https://ghislaingirardeau.github.io'; // Changez pour https en production
