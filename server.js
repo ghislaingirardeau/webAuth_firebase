@@ -27,7 +27,7 @@ const origin = process.env.DEV
 // Configuration de base
 app.use(
   cors({
-    origin: ['http://localhost:9200', 'https://ghislaingirardeau.github.io/'],
+    origin: ['http://localhost:9200', 'https://ghislaingirardeau.github.io'],
     credentials: true,
   })
 );
