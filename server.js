@@ -19,10 +19,10 @@ const port = process.env.PORT || 3000;
 // Configuration WebAuthn
 const rpID = process.env.DEV
   ? 'localhost'
-  : 'https://webauth-firebase.onrender.com/'; // Domaine de votre application
+  : 'https://webauth-firebase.onrender.com'; // Domaine de votre application
 const origin = process.env.DEV
   ? `http://${rpID}:9200`
-  : 'https://ghislaingirardeau.github.io/'; // Changez pour https en production
+  : 'https://ghislaingirardeau.github.io'; // Changez pour https en production
 
 // Configuration de base
 app.use(
