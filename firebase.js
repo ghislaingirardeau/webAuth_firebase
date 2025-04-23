@@ -1,8 +1,12 @@
 import admin from 'firebase-admin';
 
+import 'dotenv/config';
+
 import { readFile } from 'fs/promises';
 const serviceAccount = JSON.parse(
-  await readFile(new URL('./service_todo_list.json', import.meta.url))
+  await readFile(
+    new URL(process.env.GOOGLE_APPLICATION_CREDENTIALS, import.meta.url)
+  )
 );
 
 admin.initializeApp({
