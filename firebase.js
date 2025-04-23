@@ -1,7 +1,5 @@
 import admin from 'firebase-admin';
 
-import 'dotenv/config';
-
 import { readFile } from 'fs/promises';
 const serviceAccount = JSON.parse(
   await readFile(

@@ -17,13 +17,17 @@ const app = express();
 const port = process.env.PORT || 3000;
 
 // Configuration WebAuthn
-const rpID = 'localhost'; // Domaine de votre application
-const origin = `http://${rpID}:9200`; // Changez pour https en production
+const rpID = process.env.DEV
+  ? 'localhost'
+  : 'https://webauth-firebase.onrender.com/'; // Domaine de votre application
+const origin = process.env.DEV
+  ? `http://${rpID}:9200`
+  : 'https://ghislaingirardeau.github.io/'; // Changez pour https en production
 
 // Configuration de base
 app.use(
   cors({
-    origin: 'http://localhost:9200', // URL de votre application Quasar
+    origin: ['http://localhost:9200', 'https://ghislaingirardeau.github.io/'],
     credentials: true,
   })
 );
@@ -42,7 +46,9 @@ app.use(
   })
 );
 
-// let userDBCredential = new Map();
+app.get('/', async (req, res) => {
+  res.send('Hello, Im your WebAuthn server for tools shop app!');
+});
 
 /* REGISTRATION TO WEBAUTH*/
 
