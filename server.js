@@ -11,7 +11,7 @@ import {
 } from '@simplewebauthn/server';
 import { isoUint8Array } from '@simplewebauthn/server/helpers';
 
-import admin from './firebase.js';
+import { admin, db } from './firebase.js';
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -42,7 +42,7 @@ app.use(
   })
 );
 
-let userDBCredential = {};
+// let userDBCredential = new Map();
 
 /* REGISTRATION TO WEBAUTH*/
 
@@ -89,12 +89,13 @@ app.post('/auth/verify-registration', async (req, res) => {
 
   if (verification.verified) {
     /* TODO: Credential a enregistrer dans la base de données */
-    userDBCredential = {
-      ...verification.registrationInfo.credential,
-      userHandle: req.session.user.uid,
-    };
+    const credential = verification.registrationInfo.credential;
 
-    console.log('userDBCredential', userDBCredential);
+    // Save plusieurs credentials par utilisateur :
+    await db
+      .collection('credentials')
+      .doc(credential.id)
+      .set({ ...credential, uid: req.session.user.uid });
 
     // Pas besoin de createCustomToken car le user est déjà connecté via firebase auth
 
@@ -107,18 +108,9 @@ app.post('/auth/verify-registration', async (req, res) => {
 /* LOGIN */
 
 app.get('/auth/generate-authentication-options', async (req, res) => {
-  /* TODO: récupère les credentials depuis la base de donnée */
-  const userCredential = userDBCredential;
-
   const options = await generateAuthenticationOptions({
     rpID: rpID,
-    allowCredentials: [
-      {
-        id: userCredential.id,
-        type: 'public-key',
-        transports: ['internal'],
-      },
-    ],
+
     userVerification: 'required',
   });
 
@@ -130,9 +122,14 @@ app.get('/auth/generate-authentication-options', async (req, res) => {
 app.post('/auth/verify-authentication', async (req, res) => {
   const expectedChallenge = req.session.challenge;
 
-  /* récupère les credentials depuis la base de donnée */
-  /* TODO: J'ai besoin d'une info venant du front pour savoir quel user trouver !!! */
-  const userCredential = userDBCredential;
+  /* récupère les credentials correspondant à l'authentificator depuis la base de donnée */
+  /* l'id de la credential / authentificator */
+
+  const credentialRef = db.collection('credentials').doc(req.body.id); // id de la credential
+
+  const credentialSnap = await credentialRef.get();
+
+  const userCredential = credentialSnap.data();
 
   const verification = await verifyAuthenticationResponse({
     response: req.body,
@@ -143,21 +140,20 @@ app.post('/auth/verify-authentication', async (req, res) => {
       id: userCredential.id,
       publicKey: userCredential.publicKey,
       counter: userCredential.counter,
-      userHandle: userCredential.userHandle,
     },
   });
 
   if (verification.verified) {
-    const firebaseUid = userCredential.userHandle;
+    const firebaseUid = userCredential.uid;
 
-    console.log('firebaseUid', req.body);
+    console.log('firebaseUid', userCredential);
 
-    // const firebaseToken = await admin.auth().createCustomToken(firebaseUid);
+    const firebaseToken = await admin.auth().createCustomToken(firebaseUid);
 
     req.session.challenge = undefined;
     req.session.loggedIn = true;
     // créer une session ou retourner un token
-    res.json({ success: true /* token: firebaseToken */ });
+    res.json({ success: true, token: firebaseToken });
   } else {
     res.status(401).json({ success: false });
   }
